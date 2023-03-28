@@ -1,6 +1,9 @@
-# A simulation of the \"Monty Hall\" problem, for any number of doors.
-
-using ProgressMeter, Format, ArgParse
+#!julia
+# A simulation of the "Monty Hall" problem, for any number of doors.
+using Logging: global_logger
+using TerminalLoggers: TerminalLogger
+global_logger(TerminalLogger(right_justify=120))
+using ProgressLogging, Format, ArgParse
 
 VERBOSE = false
 
@@ -60,7 +63,7 @@ function simulate_monty(;n_trials::Int, n_doors::Int, n_opens::Int)
 	((switch, lose) => 0)
     )
     
-    @showprogress for trial in 1:n_trials
+    @progress for trial in 1:n_trials
 	car_door = rand(1:n_doors)
 	first_choice = 1
 	final_choice = 0 # a losing value
