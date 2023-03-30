@@ -43,11 +43,11 @@ function simulate_monty(;trials::T, doors::T, opens::T) where T<:Int
     i_last::T = doors - opens
     
     for trial in 1:trials
-	car::T = rand(1:doors)
+	    car::T = rand(1:doors)
         if car == 1
             stay_wins += 1
         end
-	switch_choice::T = rand(2:i_last)
+	    switch_choice::T = rand(2:i_last)
         if car > i_last
             switch_choice += car - i_last
         end
