@@ -1,5 +1,6 @@
 #!julia
-# A simulation of the "Monty Hall" problem, for any number of doors.
+
+# A simulation of the "Monty Hall" problem, for an arbitrary number of doors.
 using Logging: global_logger
 using TerminalLoggers: TerminalLogger
 global_logger(TerminalLogger(right_justify=120))
@@ -7,43 +8,25 @@ using ProgressLogging, Format, ArgParse
 
 VERBOSE = false
 
-@enum Decision stay switch
-@enum Outcome win lose
-
-
-#=
-Print the results of a simulation run.
-=#
-function print_stats(n_trials::Int, n_doors::Int, n_opens::Int, 
-		stats::Dict{Tuple{Decision, Outcome}, Int})
-	stay_win = stats[(stay, win)]
-	stay_lose = stats[(stay, lose)]
-	switch_win = stats[(switch, win)]
-	switch_lose = stats[(switch, lose)]
-	total_wins = stay_win + switch_win
-	total_losses = stay_lose + switch_lose
-	total_switches = switch_win + switch_lose
-	total_stays = stay_win + stay_lose
-
-	stay_ratio = stay_win / total_stays
-	switch_ratio = switch_win / total_switches
-	advantage = switch_ratio / stay_ratio
+# Print the results of a simulation run.
+function print_stats(n_trials::T, n_doors::T, n_opens::T, 
+		stay_win::T, switch_win::T) where {T<:Int}
+	stay_ratio::Float32 = stay_win / n_trials
+	switch_ratio::Float32 = switch_win / n_trials
+	advantage::Float32 = switch_ratio / stay_ratio
 
 	ii(n) = cfmt("%'d", n)
 	println("$(ii(n_trials)) trials, $(ii(n_doors)) doors, $(ii(n_opens)) opens")
 	println("wins = switch:$(ii(switch_win)), stay:$(ii(stay_win))")
-	println("losses = switch:$(ii(switch_lose)), stay:$(ii(stay_lose))")
-	println("switch: win:$(ii(switch_win)), lose:$(ii(switch_lose))")
-	println("stay: win:$(ii(stay_win)), lose:$(ii(stay_lose))")
 	println("stay win/loss ratio = $(stay_ratio)")
 	println("switch win/loss ratio = $(switch_ratio)")
 	println("switch/stay advantage = $(advantage)")
 
-	pre_prob = 1 / n_doors
-	post_prob = ((n_doors - 1) / (n_doors - n_opens - 1)) / n_doors
+	pre_prob::Float32 = 1 / n_doors
+	post_prob::Float32 = ((n_doors - 1) / (n_doors - n_opens - 1)) / n_doors
 	println("pre-reveal chance correct =  $(pre_prob)")
 	println("post-reveal switch chance correct = $(post_prob)")
-	err = abs(((switch_ratio - post_prob) + (stay_ratio - pre_prob)) / 2)
+	err::Float32 = abs(((switch_ratio - post_prob) + (stay_ratio - pre_prob)) / 2)
 	println("error = $(err)")
 end
 
@@ -52,46 +35,29 @@ Generalized "Monty Hall" problem, with any number of doors, any number of
 doors opened, and simulating any number of trials. Optimized to skip over
 cases that don't need to be computed.
 =#
-function simulate_monty(;n_trials::Int, n_doors::Int, n_opens::Int)
-	
-    @assert n_opens < n_doors-1 "n_opens is not less than n_doors-1 ($n_opens, $n_doors)\n"
+function simulate_monty(;trials::T, doors::T, opens::T) where T<:Int
+    opens < doors-1 || throw(DomainError("opens=$opens, doors=$doors", "opens must be <= than doors-2"))
     
-    stats = Dict{Tuple{Decision, Outcome}, Int}(
-	((stay, win) => 0),
-	((stay, lose) => 0),
-	((switch, win) => 0),
-	((switch, lose) => 0)
-    )
+    stay_wins::T = 0
+    switch_wins::T = 0
+    i_last::T = doors - opens
     
-    @progress for trial in 1:n_trials
-	car_door = rand(1:n_doors)
-	first_choice = 1
-	final_choice = 0 # a losing value
-        
-	decision = rand([switch, stay])
-        
-	if decision == stay
-	    final_choice = first_choice
-	else
-	    if first_choice != car_door # otherwise final_choice is a losing value
-		last_after_opens = n_doors - n_opens
-		if car_door <= last_after_opens # no need to move anything
-		    final_choice = rand(2:last_after_opens)
-		else
-		    doors = cat(2:last_after_opens-1, car_door, dims=1)
-		    final_choice = rand(doors)
-		end
-	    end
-	end
-        
-	outcome = final_choice == car_door ? win : lose
-        
-	stats[(decision, outcome)] += 1
+    for trial in 1:trials
+	car::T = rand(1:doors)
+        if car == 1
+            stay_wins += 1
+        end
+	switch_choice::T = rand(2:i_last)
+        if car > i_last
+            switch_choice += car - i_last
+        end
+        if switch_choice == car
+            switch_wins += 1
+        end
     end
-    
-    print_stats(n_trials, n_doors, n_opens, stats)
-end
 
+    print_stats(trials, doors, opens, stay_wins, switch_wins)
+end
 
 function parse_command_line()
     s = ArgParseSettings()
@@ -109,13 +75,14 @@ function parse_command_line()
         arg_type = Int
         default = 1
     end
-
     parse_args(s)
 end
 
 function main()
     args = parse_command_line()
-    simulate_monty(n_trials=args["trials"],  n_doors=args["doors"], n_opens=args["opens"])
+    @time simulate_monty(trials=args["trials"],  doors=args["doors"], opens=args["opens"])
 end
 
-main()
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
